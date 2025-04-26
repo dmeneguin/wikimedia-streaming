@@ -1,37 +1,88 @@
 services:
-  publisher:
-    build: .
-    networks:
-      - mongo-compose-network  
-  mongo:
-    image: mongo:latest
-    container_name: mongodb
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
     ports:
-      - "27017:27017"
+      - "2181:2181"
+    networks: 
+      - broker-kafka
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: password
-    volumes:
-      - mongo-data:/data/db    
-    networks:
-      - mongo-compose-network
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
 
-  mongo-express:
-    image: mongo-express
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
     ports:
-      - 8081:8081
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    networks: 
+      - broker-kafka
     environment:
-      ME_CONFIG_BASICAUTH_USERNAME: renatogroffe
-      ME_CONFIG_BASICAUTH_PASSWORD: MongoExpress2019!
-      ME_CONFIG_MONGODB_PORT: 27017
-      ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: password
-    networks:
-      - mongo-compose-network
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-volumes:
-  mongo-data:
+  kafdrop:
+    image: obsidiandynamics/kafdrop
+    ports:
+      - "9000:9000"
+    networks: 
+      - broker-kafka
+    environment:
+      KAFKA_BROKERCONNECT: kafka:29092
+    depends_on:
+      - kafka
+
+  # spark:
+  #   build: spark/.
+  #   environment:
+  #     - SPARK_MODE=master
+  #     - SPARK_RPC_AUTHENTICATION_ENABLED=no
+  #     - SPARK_RPC_ENCRYPTION_ENABLED=no
+  #     - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+  #     - SPARK_SSL_ENABLED=no
+  #     - SPARK_USER=spark
+  #   ports:
+  #     - '8080:8080'
+  #     - '7077:7077'
+  #   networks: 
+  #     - broker-kafka
+
+  # spark-worker:
+  #   build: spark/.
+  #   environment:
+  #     - SPARK_MODE=worker
+  #     - SPARK_MASTER_URL=spark://spark:7077
+  #     - SPARK_WORKER_MEMORY=1G      #<--- adjust accordingly
+  #     - SPARK_WORKER_CORES=1
+  #     - SPARK_RPC_AUTHENTICATION_ENABLED=no
+  #     - SPARK_RPC_ENCRYPTION_ENABLED=no
+  #     - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+  #     - SPARK_SSL_ENABLED=no
+  #     - SPARK_USER=spark
+  #   networks: 
+  #     - broker-kafka
+
+  delta_consumer:
+    build: delta_consumer/.
+    depends_on:
+      - kafka
+    networks: 
+      - broker-kafka
+
+# networks: 
+#   broker-kafka:
+#     driver: bridge 
+
 networks:
-  mongo-compose-network:
-    driver: bridge
+    broker-kafka:
+        driver: bridge
+        # ipam:
+        #     driver: default
+        #     config:
+        #         - subnet: "178.18.0.0/16"       
