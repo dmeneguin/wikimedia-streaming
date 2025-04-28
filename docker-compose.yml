@@ -44,7 +44,12 @@ services:
       - kafka
     networks: 
       - broker-kafka
-
+  publisher:
+    build: publisher/.
+    depends_on:
+      - kafka
+    networks:
+      - broker-kafka
 networks:
     broker-kafka:
         driver: bridge
