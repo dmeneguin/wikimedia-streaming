@@ -23,6 +23,7 @@ df_kafka = spark.readStream \
     .option("kafka.bootstrap.servers", "kafka:29092") \
     .option("subscribe", "delta-stream") \
     .option("startingOffsets", "earliest") \
+    .option("kafka.group.id", "my_custom_consumer_group_id") \
     .load()
 
 # Parse JSON
